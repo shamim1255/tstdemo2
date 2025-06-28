@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cash Money</title>
+    <!-- Styles and Fonts (No Changes) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Firebase SDKs (No Changes) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
+    
+    <style>
+        /* All CSS from previous answer remains unchanged */
+        :root {
+            --primary-bg: #0d1b2a; --secondary-bg: #1b263b; --accent-color: #3a86ff; --text-primary: #f1faee; --text-secondary: #a9d6e5; --border-color: #415a77; --error-color: #e63946; --success-color: #52b788; --warning-color: #ffbe0b; --font-family: 'Roboto', sans-serif; --bottom-nav-height: 60px; --header-height: 55px; --info-bar-height: 30px; --notice-bar-height: auto;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { font-family: var(--font-family); background-color: var(--primary-bg); color: var(--text-primary); font-size: 16px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .hidden { display: none !important; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 1000; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.2em; backdrop-filter: blur(3px); visibility: hidden; opacity: 0; transition: opacity 0.3s, visibility 0.3s; }
+        #loading-overlay.visible { visibility: visible; opacity: 1; }
+        #loading-overlay .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: var(--accent-color); width: 30px; height: 30px; animation: spin 1s linear infinite; margin-right: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #toast-container { position: fixed; bottom: calc(var(--bottom-nav-height) + 15px); left: 50%; transform: translateX(-50%); z-index: 900; display: flex; flex-direction: column-reverse; gap: 10px; pointer-events: none; width: 90%; max-width: 320px; }
+        .toast { background-color: var(--secondary-bg); color: var(--text-primary); padding: 12px 18px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s ease-out, transform 0.3s ease-out; transform: translateY(20px); pointer-events: auto; font-size: 0.95em; display: flex; align-items: center; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast i { margin-right: 10px; font-size: 1.2em; }
+        .toast.success { border-left: 4px solid var(--success-color); }
+        .toast.error { border-left: 4px solid var(--error-color); }
+        .toast.info { border-left: 4px solid var(--accent-color); }
+        .app-container { display: none; opacity: 0; flex-direction: column; height: 100%; width: 100%; max-width: 450px; margin: 0 auto; background-color: var(--primary-bg); box-shadow: 0 0 20px rgba(0,0,0,0.3); overflow: hidden; position: relative; transition: opacity 0.5s ease-in; }
+        .app-container.visible { display: flex; opacity: 1; }
+        .app-header { flex-shrink: 0; background-color: var(--secondary-bg); color: var(--text-primary); padding: 15px; text-align: center; font-size: 1.3em; font-weight: 600; height: var(--header-height); z-index: 10; border-bottom: 1px solid var(--border-color); }
+        .content-area { flex-grow: 1; overflow-y: auto; background-color: var(--primary-bg); -webkit-overflow-scrolling: touch; min-height: 0; padding-bottom: calc(var(--bottom-nav-height) + 15px); }
+        .view { display: none; padding: 15px; animation: fadeIn 0.3s ease-in-out; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .data-list { list-style: none; padding: 0; margin: 0; }
+        .data-list li { background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 12px; padding: 15px; transition: background-color 0.2s ease, transform 0.2s ease; cursor: default; }
+        .data-list .item-actions .action-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; text-decoration: none; display: inline-block; text-align: center; transition: background-color 0.2s ease; }
+        .data-list .item-actions .action-btn.primary { background-color: var(--accent-color); color: white; }
+        .data-list .item-actions .action-btn:disabled { background-color: var(--border-color); cursor: not-allowed; opacity: 0.7; }
+        .data-list .cooldown-timer { font-size: 0.9em; color: var(--warning-color); font-weight: 500; text-align: right; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; max-width: 450px; margin: 0 auto; height: var(--bottom-nav-height); background-color: var(--secondary-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center; z-index: 30; flex-shrink: 0; }
+        .bottom-nav button { background: none; border: none; color: var(--text-secondary); font-family: var(--font-family); font-size: 0.75em; text-align: center; cursor: pointer; padding: 8px 5px 5px 5px; flex-grow: 1; display: flex; flex-direction: column; align-items: center; transition: color 0.2s ease, transform 0.2s ease; line-height: 1.2; min-width: 0;}
+        .bottom-nav button i { font-size: 1.6em; margin-bottom: 3px; }
+        .bottom-nav button.active { color: var(--accent-color); transform: translateY(-2px); }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow-y: auto; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; backdrop-filter: blur(3px); animation: fadeInModal 0.3s ease-out; }
+        .modal.active { display: flex; }
+        @keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { background-color: var(--secondary-bg); margin: auto; padding: 25px; border: 1px solid var(--border-color); width: 90%; max-width: 420px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); animation: slideInModal 0.3s ease-out; max-height: 85vh; display: flex; flex-direction: column; }
+        @keyframes slideInModal { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;}
+        .modal-header h2 { margin: 0; font-size: 1.2em; color: var(--text-primary); }
+        .modal-close-button { color: var(--text-secondary); font-size: 1.6em; font-weight: bold; cursor: pointer; background: none; border: none; line-height: 1; padding: 0 5px; }
+        .modal-body { margin-bottom: 20px; overflow-y: auto; flex-grow: 1; -webkit-overflow-scrolling: touch; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;}
+        .modal-footer button { padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; font-family: var(--font-family); font-weight: 500; flex: 0 1 auto; font-size: 0.95em;}
+        #ad-task-modal-body { min-height: 200px; display: flex; justify-content: center; align-items: center; background-color: var(--primary-bg); border-radius: 8px; position: relative; overflow: auto; padding: 10px;}
+        #ad-task-modal-body > * { max-width: 100%; }
+        /* Other styles are omitted for brevity, they are the same as before */
+    </style>
+</head>
+<body>
+    <!-- All HTML structure is the same as the previous answer -->
+    <div id="loading-overlay" class="hidden"><div class="spinner"></div>Loading...</div>
+    <div id="toast-container"></div>
+    <div id="auth-view">...</div>
+    <div class="app-container hidden">
+        <header class="app-header" id="app-title-text">Cash Money</header>
+        <main class="content-area">
+            <div id="view-home" class="view active">
+                <h3 style="margin-bottom: 20px;">Ad Tasks</h3>
+                <ul id="ad-tasks-list" class="data-list"></ul>
+            </div>
+            <!-- Other views are here -->
+        </main>
+        <nav class="bottom-nav">...</nav>
+    </div>
+    <div id="ad-task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="ad-task-modal-title"></h2>
+                <button class="modal-close-button" onclick="closeAdTaskModal()">×</button>
+            </div>
+            <div class="modal-body" id="ad-task-modal-body"></div>
+            <div class="modal-footer" style="flex-direction: column; align-items: center; gap: 15px;">
+                <button id="ad-task-claim-btn" class="primary-btn" style="width: 100%;">Claim Reward</button>
+                <p style="font-size: 0.8em; color: var(--text-secondary);">Close this window after the ad to claim your reward.</p>
+            </div>
+        </div>
+    </div>
+    <!-- Other modals -->
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        // --- Firebase Config (No Changes) ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyC5ETTFZYnnAjM8YXagOue6_09_1Kd3hYM",
+          authDomain: "fm-radio-82dbc.firebaseapp.com",
+          databaseURL: "https://fm-radio-82dbc-default-rtdb.firebaseio.com",
+          projectId: "fm-radio-82dbc",
+          storageBucket: "fm-radio-82dbc.appspot.com",
+          messagingSenderId: "868347085357",
+          appId: "1:868347085357:web:1f1136242670ab8bc1eea4",
+          measurementId: "G-BL5K5XVFCV"
+        };
+        
+        // --- Firebase Init (No Changes) ---
+        let fbApp, fbAuth, fbDb, fbAnalytics;
+        try {
+            fbApp = firebase.initializeApp(firebaseConfig);
+            fbAuth = firebase.auth();
+            fbDb = firebase.database();
+            fbAnalytics = firebase.analytics();
+        } catch (e) {
+            document.body.innerHTML = `<div>Critical Error: ${e.message}</div>`;
+            throw new Error("Firebase Init Failed");
+        }
+
+        // --- All other DOM element selections and state variables are the same ---
+        const adTaskModalBodyEl = document.getElementById('ad-task-modal-body');
+        // ... all other variables
+        let allAdTasks = {};
+        let currentUser = null;
+
+        // --- NEW: Improved Ad Task Display Function ---
+        function showAdTask(taskId) {
+            const task = allAdTasks[taskId];
+            if (!task) {
+                console.error("Task data not found for ID:", taskId);
+                showToast("Error: Task not found.", "error");
+                return;
+            }
+
+            document.getElementById('ad-task-modal-title').textContent = task.title;
+            const adBody = document.getElementById('ad-task-modal-body');
+            adBody.innerHTML = ''; // Clear previous content
+
+            // This is a more reliable way to load external scripts
+            const adContainer = document.createElement('div');
+            adContainer.innerHTML = task.adCode;
+            
+            // Find and execute script tags
+            const scripts = adContainer.querySelectorAll('script');
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement('script');
+                // Copy all attributes
+                Array.from(oldScript.attributes).forEach(attr => {
+                    newScript.setAttribute(attr.name, attr.value);
+                });
+                // Copy script content if it's inline
+                if (oldScript.innerHTML) {
+                    newScript.innerHTML = oldScript.innerHTML;
+                }
+                // Append the new script to the body to execute it
+                adBody.appendChild(newScript);
+                oldScript.remove(); // Remove the original non-executable script
+            });
+
+            // Append the rest of the HTML content (if any)
+             while (adContainer.firstChild) {
+                adBody.appendChild(adContainer.firstChild);
+            }
+            
+            // Re-bind the claim button
+            const claimBtn = document.getElementById('ad-task-claim-btn');
+            const newClaimBtn = claimBtn.cloneNode(true);
+            claimBtn.parentNode.replaceChild(newClaimBtn, claimBtn);
+            
+            newClaimBtn.disabled = false;
+            newClaimBtn.textContent = `Claim ${task.points} Points`;
+            newClaimBtn.onclick = () => claimAdTaskReward(taskId);
+
+            showModal('ad-task-modal');
+        }
+
+        function closeAdTaskModal() {
+            closeModal('ad-task-modal');
+            document.getElementById('ad-task-modal-body').innerHTML = ''; // Important: Clears the ad on close
+        }
+
+        // --- The rest of your JavaScript code remains exactly the same as the previous answer. ---
+        // I have omitted it here for brevity, but you should keep all the other functions
+        // like listenToAdTasks, renderAdTasksList, claimAdTaskReward, auth listeners, etc.
+        // from the previous complete code I provided.
+
+        // PASTE ALL OTHER JAVASCRIPT FUNCTIONS FROM THE PREVIOUS ANSWER HERE
+        // ... (This includes listenToAdTasks, renderAdTasksList, claimAdTaskReward,
+        //      all auth functions, navigation, other task types, etc.)
+        
+        // --- Dummy function placeholder for remaining code ---
+        function all_other_javascript_code_from_previous_answer() {
+            // This is where you would paste all the other JS functions
+            // to make this a complete, working file.
+        }
+
+    </script>
+</body>
+</html>
